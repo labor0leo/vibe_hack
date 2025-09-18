@@ -4,26 +4,41 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Auto Download</title>
+  <!-- 선택: favicon 404 방지 -->
+  <link rel="icon" href="data:,">
   <style>
-    body { font-family: system-ui, sans-serif; padding: 24px; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.5; padding: 24px; }
+    .wrap { max-width: 720px; margin: 0 auto; }
     .muted { color: #666; font-size: 14px; }
     .hidden { display: none; }
-    .err { color: #c00; white-space: pre-wrap; font-size: 13px; }
+    .err { color:#c00; white-space:pre-wrap; font-size:13px; }
+    details { margin-top: 12px; }
   </style>
 </head>
 <body>
-  <h1>파일 준비 중…</h1>
-  <p class="muted">접속 시 자동으로 다운로드합니다.</p>
-  <button id="manual" class="hidden">수동 다운로드</button>
-  <pre id="log" class="err"></pre>
+  <div class="wrap">
+    <h1>파일 준비 중…</h1>
+    <p class="muted">접속 시 자동으로 다운로드합니다. 차단되면 아래 버튼으로 시도하세요.</p>
+    <p><button id="manual" class="hidden">수동으로 다운로드</button></p>
 
-  <!-- ✅ 반드시 download.js보다 '먼저' 정의해야 합니다 -->
+    <details open>
+      <summary>진단 로그</summary>
+      <pre id="log" class="err"></pre>
+    </details>
+  </div>
+
+  <!-- ✅ 반드시 download.js 보다 '먼저' 정의하세요 -->
   <script>
-    window.RELATIVE_FILE_PATH = "assets/my-image.jpeg"; // 정확한 경로
-    window.DOWNLOAD_FILE_NAME = "my-image.jpeg";        // 저장될 이름
+    // 리포 안에서의 '정확한 상대경로/대소문자'를 입력
+    // 예: assets/my-image.jpeg  (폴더/파일명 철자 100% 일치!)
+    window.RELATIVE_FILE_PATH = "assets/my-image.jpeg";
+
+    // 저장 파일명: 원본명 유지하려면 빈 문자열("") 그대로 두기
+    // 특정 이름으로 저장하고 싶으면 "원하는이름.jpeg" 로 지정
+    window.DOWNLOAD_FILE_NAME = "";
   </script>
 
-  <!-- 변수 정의 후 download.js 불러오기 -->
-  <script src="./download.js"></script>
+  <!-- 변수 정의 후 스크립트 로드. 같은 폴더면 ./download.js 가 맞습니다 -->
+  <script src="./download.js" defer></script>
 </body>
 </html>
