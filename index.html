@@ -4,37 +4,26 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Auto Download</title>
-  <meta name="description" content="Visit → auto download one file" />
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; line-height: 1.5; padding: 24px; }
-    .wrap { max-width: 720px; margin: 0 auto; }
+    body { font-family: system-ui, sans-serif; padding: 24px; }
     .muted { color: #666; font-size: 14px; }
     .hidden { display: none; }
+    .err { color: #c00; white-space: pre-wrap; font-size: 13px; }
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>파일을 준비하는 중…</h1>
-    <p class="muted">브라우저가 자동으로 다운로드를 시작합니다. 차단되면 아래 버튼을 눌러주세요.</p>
-    <p><button id="manual" class="hidden">수동으로 다운로드</button></p>
-  </div>
+  <h1>파일 준비 중…</h1>
+  <p class="muted">접속 시 자동으로 다운로드합니다.</p>
+  <button id="manual" class="hidden">수동 다운로드</button>
+  <pre id="log" class="err"></pre>
 
-  <!-- 설정: 다운로드할 파일 경로/이름 -->
+  <!-- ✅ 반드시 download.js보다 '먼저' 정의해야 합니다 -->
   <script>
-    // 리포지토리 내부 경로 (예: assets/my-image.jpg)
-    window.DOWNLOAD_FILE_PATH = "assets/my-image.jpg";
-    // 저장 시 사용자에게 보일 파일명
-    window.DOWNLOAD_FILE_NAME = "my-image.jpg";
-
-    // Project Pages인 경우(주소가 /<repo>/를 포함), basePath 보정
-    (function fixBasePath(){
-      // username.github.io/<repo>/index.html 같은 경로에서 동작하도록 상대경로 보정
-      var path = location.pathname;
-      // /<repo>/ 로 시작하면 그 prefix를 assets 경로 앞에 붙여줌
-      // 하지만 우리는 상대경로를 쓰므로 보정 불필요. 남겨두는 건 참고용입니다.
-    })();
+    window.RELATIVE_FILE_PATH = "assets/my-image.jpeg"; // 정확한 경로
+    window.DOWNLOAD_FILE_NAME = "my-image.jpeg";        // 저장될 이름
   </script>
 
-  <script src="download.js"></script>
+  <!-- 변수 정의 후 download.js 불러오기 -->
+  <script src="./download.js"></script>
 </body>
 </html>
