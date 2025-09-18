@@ -1,0 +1,4 @@
+/assets/my-image.jpeg
+  Content-Type: image/jpeg
+  Content-Disposition: attachment; filename="my-image.jpeg"
+  Cache-Control: no-store
