@@ -1,64 +1,115 @@
 (function () {
-  const rawPath = (window.DOWNLOAD_FILE_PATH || "assets/my-image.jpeg").trim();
+  const relPath = (window.RELATIVE_FILE_PATH || "").trim();
   const preferredName = (window.DOWNLOAD_FILE_NAME || "").trim();
   const manualBtn = document.getElementById("manual");
   const logEl = document.getElementById("log");
 
-  function log(msg) {
-    if (!logEl) return;
-    logEl.textContent = (logEl.textContent ? logEl.textContent + "\n" : "") + msg;
-    logEl.classList.remove("hidden");
+  function log(...args) {
+    const msg = args.map(String).join(" ");
+    console.log("[auto-download]", msg);
+    if (logEl) logEl.textContent += msg + "\n";
   }
 
-  // URL 인코딩 (공백, 한글, 특수문자 등)
-  // 상대경로 유지: encodeURI는 /는 그대로 두고 나머지만 인코딩
-  const filePath = encodeURI(rawPath);
+  if (!relPath) {
+    log("❌ RELATIVE_FILE_PATH 가 비어있습니다.");
+    return;
+  }
 
-  // URL에서 원래 파일명 추출 (확장자 포함)
+  // 현재 페이지의 베이스 경로 계산:
+  // - 사용자/조직 페이지: https://username.github.io/  → base = "/"
+  // - 프로젝트 페이지:   https://username.github.io/repo/ → base = "/repo/"
+  // - /docs 배포:        https://.../repo/ (docs 안으로 빌드되지만 URL은 /repo/)
+  function getBasePath() {
+    const parts = location.pathname.split("/").filter(Boolean); // ["repo", ...] 또는 []
+    if (parts.length === 0) return "/";        // user/org pages root
+    // 첫 세그먼트가 리포 이름일 확률이 큼 → "/repo/"
+    return "/" + parts[0] + "/";
+  }
+
+  // 절대 경로로 변환 (상대 경로 인코딩 포함)
+  function toAbsoluteURL(relative) {
+    // 캐시 무력화 쿼리 붙이기(CDN 잔존 캐시 회피)
+    const cacheBust = "v=" + Date.now();
+    // 상대경로의 안전 인코딩 (슬래시는 유지)
+    const safeRel = encodeURI(relative);
+    const base = getBasePath();
+    // location.origin + base + safeRel (중복 슬래시 정리)
+    let url = location.origin.replace(/\/+$/, "") + base + safeRel.replace(/^\/+/, "");
+    url += (url.includes("?") ? "&" : "?") + cacheBust;
+    return url;
+  }
+
   function filenameFromURL(url) {
     try {
-      const u = new URL(url, location.href);
+      const u = new URL(url);
       const last = u.pathname.split("/").filter(Boolean).pop() || "download";
       return last;
     } catch {
-      // 상대경로일 경우 간단 파서
-      const parts = url.split("?")[0].split("#")[0].split("/");
-      return (parts[parts.length - 1] || "download").trim() || "download";
+      const clean = url.split("?")[0].split("#")[0];
+      const parts = clean.split("/");
+      return parts[parts.length - 1] || "download";
     }
   }
 
-  async function triggerDownload() {
+  async function headOK(url) {
     try {
-      // 1) HEAD로 존재/경로 확인 (404 조기 감지, 대소문자 문제 진단)
-      const headRes = await fetch(filePath, { method: "HEAD", cache: "no-store" });
-      if (!headRes.ok) {
-        throw new Error(`HEAD ${headRes.status} — 경로/대소문자를 확인하세요: ${filePath}`);
-      }
+      const r = await fetch(url, { method: "HEAD", cache: "no-store" });
+      return r.ok ? r : null;
+    } catch { return null; }
+  }
 
-      // 2) Blob으로 받아 강제 저장 (파일명은 기본적으로 원래 이름 사용)
-      const res = await fetch(filePath, { cache: "no-store" });
-      if (!res.ok) throw new Error(`GET ${res.status} — 파일을 받을 수 없습니다: ${filePath}`);
+  async function pickWorkingURL(candidates) {
+    for (const c of candidates) {
+      const r = await headOK(c);
+      log("HEAD", c, r ? `→ ${r.status}` : "→ (network error)");
+      if (r && r.ok) return c;
+    }
+    return null;
+  }
+
+  async function triggerDownload() {
+    // 후보 URL들:
+    const abs = toAbsoluteURL(relPath);             // 권장(베이스 보정)
+    const naive = new URL(relPath, location.href).href + "&n=" + Date.now(); // 혹시 모를 대비
+    const candidates = [abs, naive];
+
+    log("🔎 후보 URL:");
+    candidates.forEach((u, i) => log(`  [${i}] ${u}`));
+
+    const url = await pickWorkingURL(candidates);
+    if (!url) {
+      log("❌ 어떤 후보도 HEAD 200을 받지 못했습니다. 경로/대소문자/파일 위치를 점검하세요.");
+      manualBtn?.classList.remove("hidden");
+      manualBtn.onclick = () => open(candidates[0], "_blank");
+      return;
+    }
+
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      log("GET", url, "→", res.status, res.headers.get("content-type") || "(no CT)");
+      if (!res.ok) throw new Error(`GET ${res.status}`);
+
       const blob = await res.blob();
 
-      // 파일명 결정 우선순위: 사용자가 강제 지정 > URL에서 추출
-      const finalName = preferredName || filenameFromURL(filePath);
+      // 파일명: 지정값 > URL 추출(원본 확장자 보존)
+      const finalName = preferredName || filenameFromURL(url);
+      log("⬇️ 저장 파일명:", finalName);
 
-      const url = URL.createObjectURL(blob);
+      const objURL = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = finalName; // 원래 확장자(.jpeg 등) 그대로 보존
+      a.href = objURL;
+      a.download = finalName;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 0);
+      setTimeout(() => URL.revokeObjectURL(objURL), 0);
     } catch (e) {
-      log(`[auto-download] 오류: ${e.message || e}`);
-      // 3) fallback: 직접 링크 제공 (차단/호환 이슈 대비)
+      log("❌ 다운로드 중 오류:", e && e.message ? e.message : e);
       manualBtn?.classList.remove("hidden");
       manualBtn.onclick = () => {
         const a = document.createElement("a");
-        a.href = filePath;
-        a.download = preferredName || filenameFromURL(filePath);
+        a.href = url;
+        a.download = preferredName || filenameFromURL(url);
         document.body.appendChild(a);
         a.click();
         a.remove();
@@ -66,20 +117,5 @@
     }
   }
 
-  // 첫 방문만 실행하려면 true
-  const FIRST_ONLY = false;
-
-  window.addEventListener("DOMContentLoaded", () => {
-    if (FIRST_ONLY) {
-      const key = "auto_down_once";
-      if (!localStorage.getItem(key)) {
-        localStorage.setItem(key, "1");
-        triggerDownload();
-      } else {
-        manualBtn?.classList.remove("hidden");
-      }
-    } else {
-      triggerDownload();
-    }
-  });
+  window.addEventListener("DOMContentLoaded", triggerDownload);
 })();
